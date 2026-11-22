@@ -1,0 +1,40 @@
+name: Atualizar FIIs
+
+# Dias úteis depois do fechamento da B3 (19:30 e 22:30 em Brasília = 22:30 e 01:30 UTC) e botão manual.
+# A segunda execução só serve de reforço: se nada mudou, não faz commit.
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"
+    - cron: "30 1 * * 2-6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Gerar fiis.json
+        run: |
+          for i in 1 2 3; do
+            python gerar_fiis.py && break
+            echo "Tentativa $i falhou"; sleep 600
+          done
+          test -s fiis.json
+      - name: Salvar se mudou
+        run: |
+          if git diff --quiet -- fiis.json; then
+            echo "Sem mudanças."
+          else
+            git config user.name "fiis-bot"
+            git config user.email "fiis-bot@users.noreply.github.com"
+            git add fiis.json
+            git commit -m "Atualiza FIIs ($(date -u +%F))"
+            git push
+          fi
